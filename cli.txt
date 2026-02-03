@@ -1,0 +1,2 @@
+go get github.com/docker/docker@latest
+go mod tidy
