@@ -16,13 +16,33 @@ go build
 
 ## Sử dụng
 
+### Xuất tất cả các cột (mặc định)
+
 ```bash
 ./docker-images-csv
 ```
 
-Chương trình sẽ tạo file `docker_images.csv` chứa thông tin tất cả Docker images.
+Chương trình sẽ tạo file `docker_images.csv` chứa thông tin tất cả Docker images với đầy đủ các cột.
 
-## Các cột trong CSV
+### Xuất các cột được chọn
+
+```bash
+./docker-images-csv --column=Repository,Tag
+```
+
+Chương trình sẽ tạo file `docker_images_Repository_Tag.csv` chỉ chứa 2 cột Repository và Tag.
+
+**Ví dụ khác:**
+
+```bash
+# Chỉ xuất ID và Size
+./docker-images-csv --column=ID,Size (MB)
+
+# Xuất Repository, Tag và Created
+./docker-images-csv --column=Repository,Tag,Created
+```
+
+## Các cột có sẵn
 
 - **ID**: Docker image ID (12 ký tự)
 - **Repository**: Tên repository
@@ -33,6 +53,10 @@ Chương trình sẽ tạo file `docker_images.csv` chứa thông tin tất cả
 - **VirtualSize (MB)**: Kích thước ảo (MB)
 - **Containers**: Số lượng container đang dùng image
 - **Labels**: Labels của image (định dạng key=value)
+
+## Tham số dòng lệnh
+
+- `--column`: Danh sách các cột cần xuất, phân tách bởi dấu phẩy. Nếu không chỉ định, sẽ xuất tất cả các cột.
 
 ## Ví dụ output
 

@@ -3,15 +3,61 @@ package main
 import (
 	"context"
 	"encoding/csv"
+	"flag"
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/client"
 )
 
 func main() {
+	// Parse command-line flags
+	columnsFlag := flag.String("column", "", "Comma-separated list of columns to export (e.g., Repository,Tag)")
+	flag.Parse()
+
+	// Define all available columns
+	allColumns := []string{
+		"ID",
+		"Repository",
+		"Tag",
+		"Created",
+		"Size (MB)",
+		"SharedSize (MB)",
+		"VirtualSize (MB)",
+		"Containers",
+		"Labels",
+	}
+
+	// Determine which columns to export
+	var selectedColumns []string
+	var columnIndices []int
+	if *columnsFlag != "" {
+		selectedColumns = strings.Split(*columnsFlag, ",")
+		// Validate and get indices
+		for _, col := range selectedColumns {
+			col = strings.TrimSpace(col)
+			found := false
+			for idx, availCol := range allColumns {
+				if col == availCol {
+					columnIndices = append(columnIndices, idx)
+					found = true
+					break
+				}
+			}
+			if !found {
+				log.Fatalf("Invalid column name: %s\nAvailable columns: %s", col, strings.Join(allColumns, ", "))
+			}
+		}
+	} else {
+		selectedColumns = allColumns
+		for i := range allColumns {
+			columnIndices = append(columnIndices, i)
+		}
+	}
+
 	// Create Docker client
 	ctx := context.Background()
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
@@ -26,8 +72,14 @@ func main() {
 		log.Fatalf("Failed to list images: %v", err)
 	}
 
+	// Generate filename
+	filename := "docker_images.csv"
+	if *columnsFlag != "" {
+		filename = "docker_images_" + strings.ReplaceAll(*columnsFlag, ",", "_") + ".csv"
+	}
+
 	// Create CSV file
-	file, err := os.Create("docker_images.csv")
+	file, err := os.Create(filename)
 	if err != nil {
 		log.Fatalf("Failed to create CSV file: %v", err)
 	}
@@ -36,19 +88,8 @@ func main() {
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// Write CSV header
-	header := []string{
-		"ID",
-		"Repository",
-		"Tag",
-		"Created",
-		"Size (MB)",
-		"SharedSize (MB)",
-		"VirtualSize (MB)",
-		"Containers",
-		"Labels",
-	}
-	if err := writer.Write(header); err != nil {
+	// Write CSV header (only selected columns)
+	if err := writer.Write(selectedColumns); err != nil {
 		log.Fatalf("Failed to write header: %v", err)
 	}
 
@@ -85,7 +126,8 @@ func main() {
 			labels += fmt.Sprintf("%s=%s", k, v)
 		}
 
-		row := []string{
+		// Build full row with all data
+		fullRow := []string{
 			img.ID[7:19], // Short ID
 			repo,
 			tag,
@@ -97,7 +139,13 @@ func main() {
 			labels,
 		}
 
-		if err := writer.Write(row); err != nil {
+		// Filter row to only include selected columns
+		var filteredRow []string
+		for _, idx := range columnIndices {
+			filteredRow = append(filteredRow, fullRow[idx])
+		}
+
+		if err := writer.Write(filteredRow); err != nil {
 			log.Fatalf("Failed to write row: %v", err)
 		}
 
@@ -114,7 +162,7 @@ func main() {
 				}
 			}
 
-			row := []string{
+			fullRow := []string{
 				img.ID[7:19],
 				repo,
 				tag,
@@ -125,11 +173,17 @@ func main() {
 				fmt.Sprintf("%d", img.Containers),
 				labels,
 			}
-			if err := writer.Write(row); err != nil {
+
+			var filteredRow []string
+			for _, idx := range columnIndices {
+				filteredRow = append(filteredRow, fullRow[idx])
+			}
+
+			if err := writer.Write(filteredRow); err != nil {
 				log.Fatalf("Failed to write row: %v", err)
 			}
 		}
 	}
 
-	fmt.Printf("Successfully exported %d images to docker_images.csv\n", len(images))
+	fmt.Printf("Successfully exported %d images to %s\n", len(images), filename)
 }
